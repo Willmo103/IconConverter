@@ -1,6 +1,9 @@
-﻿using System.Drawing;
+﻿using System;
+using System.Drawing;
 using System.Drawing.Imaging;
-
+using System.IO;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace PngToIcoConverter
 {
@@ -71,112 +74,133 @@ namespace PngToIcoConverter
 
         static void ConvertPngToIco(string inputFilePath, string outputFolderPath)
         {
-            using (var pngImage = new Bitmap(inputFilePath))
+            try
             {
-                if (pngImage == null)
+                using (var pngImage = new Bitmap(inputFilePath))
                 {
-                    Console.WriteLine("Error: Failed to load the input PNG image.");
-                    return;
-                }
-
-                // Define the different sizes for the ICO files
-                List<int> iconSizes = new List<int> { 16, 32, 48, 64, 128, 256 };
-                string outputFilePath = Path.Combine(outputFolderPath, $"{Path.GetFileNameWithoutExtension(inputFilePath)}.ico");
-
-                using (FileStream icoStream = new FileStream(outputFilePath, FileMode.Create))
-                {
-                    using (BinaryWriter writer = new BinaryWriter(icoStream))
+                    if (pngImage == null)
                     {
-                        // Write the ICO header
-                        writer.Write((short)0); // Reserved
-                        writer.Write((short)1); // ICO type
-                        writer.Write((short)iconSizes.Count); // Number of images
+                        Console.WriteLine("Error: Failed to load the input PNG image.");
+                        return;
+                    }
 
-                        long imageDataOffset = 6 + (iconSizes.Count * 16);
-                        long currentOffset = imageDataOffset;
+                    // Define the different sizes for the ICO files
+                    List<int> iconSizes = new List<int> { 16, 32, 48, 64, 128, 256 };
+                    string outputFilePath = Path.Combine(outputFolderPath, $"{Path.GetFileNameWithoutExtension(inputFilePath)}.ico");
 
-                        foreach (int size in iconSizes)
+                    using (FileStream icoStream = new FileStream(outputFilePath, FileMode.Create))
+                    {
+                        using (BinaryWriter writer = new BinaryWriter(icoStream))
                         {
-                            using (Bitmap resizedImage = new Bitmap(pngImage, new Size(size, size)))
+                            // Write the ICO header
+                            writer.Write((short)0); // Reserved
+                            writer.Write((short)1); // ICO type
+                            writer.Write((short)iconSizes.Count); // Number of images
+
+                            long imageDataOffset = 6 + (iconSizes.Count * 16);
+                            long currentOffset = imageDataOffset;
+
+                            foreach (int size in iconSizes)
                             {
-                                using (MemoryStream memoryStream = new MemoryStream())
+                                using (Bitmap resizedImage = new Bitmap(pngImage, new Size(size, size)))
                                 {
-                                    resizedImage.Save(memoryStream, ImageFormat.Png);
+                                    using (MemoryStream memoryStream = new MemoryStream())
+                                    {
+                                        resizedImage.Save(memoryStream, ImageFormat.Png);
 
-                                    // Write the directory entry
-                                    writer.Write((byte)size); // Width
-                                    writer.Write((byte)size); // Height
-                                    writer.Write((byte)0); // Number of colors (0 if not a palette)
-                                    writer.Write((byte)0); // Reserved
-                                    writer.Write((short)1); // Color planes
-                                    writer.Write((short)32); // Bits per pixel
-                                    writer.Write((int)memoryStream.Length); // Size of the image data
-                                    writer.Write((int)currentOffset); // Offset of the image data
+                                        // Write the directory entry
+                                        writer.Write((byte)size); // Width
+                                        writer.Write((byte)size); // Height
+                                        writer.Write((byte)0); // Number of colors (0 if not a palette)
+                                        writer.Write((byte)0); // Reserved
+                                        writer.Write((short)1); // Color planes
+                                        writer.Write((short)32); // Bits per pixel
+                                        writer.Write((int)memoryStream.Length); // Size of the image data
+                                        writer.Write((int)currentOffset); // Offset of the image data
 
-                                    currentOffset += memoryStream.Length;
+                                        currentOffset += memoryStream.Length;
+                                    }
                                 }
                             }
-                        }
 
-                        foreach (int size in iconSizes)
-                        {
-                            using (Bitmap resizedImage = new Bitmap(pngImage, new Size(size, size)))
+                            foreach (int size in iconSizes)
                             {
-                                using (MemoryStream memoryStream = new MemoryStream())
+                                using (Bitmap resizedImage = new Bitmap(pngImage, new Size(size, size)))
                                 {
-                                    resizedImage.Save(memoryStream, ImageFormat.Png);
-                                    writer.Write(memoryStream.ToArray());
+                                    using (MemoryStream memoryStream = new MemoryStream())
+                                    {
+                                        resizedImage.Save(memoryStream, ImageFormat.Png);
+                                        writer.Write(memoryStream.ToArray());
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                Console.WriteLine($"Successfully converted '{inputFilePath}' to ICO file '{outputFilePath}'.");
+                    Console.WriteLine($"Successfully converted '{inputFilePath}' to ICO file '{outputFilePath}'.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
             }
         }
 
         static void UnpackIcoFile(string inputFilePath, string outputFolderPath)
         {
-            string outputDir = Path.Combine(outputFolderPath, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_sizes");
-            if (!Directory.Exists(outputDir))
+            try
             {
-                Directory.CreateDirectory(outputDir);
-            }
-
-            using (FileStream icoStream = new FileStream(inputFilePath, FileMode.Open))
-            {
-                using (BinaryReader reader = new BinaryReader(icoStream))
+                string outputDir = Path.Combine(outputFolderPath, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_sizes");
+                if (!Directory.Exists(outputDir))
                 {
-                    reader.BaseStream.Seek(4, SeekOrigin.Begin);
-                    short imageCount = reader.ReadInt16();
+                    Directory.CreateDirectory(outputDir);
+                }
 
-                    for (int i = 0; i < imageCount; i++)
+                using (FileStream icoStream = new FileStream(inputFilePath, FileMode.Open))
+                {
+                    using (BinaryReader reader = new BinaryReader(icoStream))
                     {
-                        reader.BaseStream.Seek(6 + i * 16, SeekOrigin.Begin);
-                        int width = reader.ReadByte();
-                        int height = reader.ReadByte();
-                        reader.BaseStream.Seek(8, SeekOrigin.Current);
-                        int imageSize = reader.ReadInt32();
-                        int imageOffset = reader.ReadInt32();
+                        reader.BaseStream.Seek(4, SeekOrigin.Begin);
+                        short imageCount = reader.ReadInt16();
 
-                        reader.BaseStream.Seek(imageOffset, SeekOrigin.Begin);
-                        byte[] imageData = reader.ReadBytes(imageSize);
-
-                        // Use MemoryStream to read PNG properly
-                        using (MemoryStream memoryStream = new MemoryStream(imageData))
+                        for (int i = 0; i < imageCount; i++)
                         {
-                            using (Bitmap bmp = new Bitmap(memoryStream))
+                            reader.BaseStream.Seek(6 + i * 16, SeekOrigin.Begin);
+                            int width = reader.ReadByte();
+                            int height = reader.ReadByte();
+                            reader.BaseStream.Seek(8, SeekOrigin.Current);
+                            int imageSize = reader.ReadInt32();
+                            int imageOffset = reader.ReadInt32();
+
+                            reader.BaseStream.Seek(imageOffset, SeekOrigin.Begin);
+                            byte[] imageData = reader.ReadBytes(imageSize);
+
+                            try
                             {
-                                string outputFilePath = Path.Combine(outputDir, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_{width}x{height}.png");
-                                bmp.Save(outputFilePath, ImageFormat.Png);
+                                // Use MemoryStream to read PNG properly
+                                using (MemoryStream memoryStream = new MemoryStream(imageData))
+                                {
+                                    using (Bitmap bmp = new Bitmap(memoryStream))
+                                    {
+                                        string outputFilePath = Path.Combine(outputDir, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_{width}x{height}.png");
+                                        bmp.Save(outputFilePath, ImageFormat.Png);
+                                    }
+                                }
+                            }
+                            catch (Exception bmpEx)
+                            {
+                                Console.WriteLine($"Error processing image at index {i}: {bmpEx.Message}");
                             }
                         }
                     }
                 }
-            }
 
-            Console.WriteLine($"Successfully unpacked ICO file '{inputFilePath}' to '{outputDir}'.");
+                Console.WriteLine($"Successfully unpacked ICO file '{inputFilePath}' to '{outputDir}'.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
         }
 
         static void PrintManPage()
