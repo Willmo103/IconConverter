@@ -1,9 +1,7 @@
-﻿using System;
-using System.Drawing;
-using System.Drawing.Imaging;
-using System.IO;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
+﻿using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace PngToIcoConverter
 {
@@ -76,14 +74,8 @@ namespace PngToIcoConverter
         {
             try
             {
-                using (var pngImage = new Bitmap(inputFilePath))
+                using (Image<Rgba32> pngImage = Image.Load<Rgba32>(inputFilePath))
                 {
-                    if (pngImage == null)
-                    {
-                        Console.WriteLine("Error: Failed to load the input PNG image.");
-                        return;
-                    }
-
                     // Define the different sizes for the ICO files
                     List<int> iconSizes = new List<int> { 16, 32, 48, 64, 128, 256 };
                     string outputFilePath = Path.Combine(outputFolderPath, $"{Path.GetFileNameWithoutExtension(inputFilePath)}.ico");
@@ -102,11 +94,11 @@ namespace PngToIcoConverter
 
                             foreach (int size in iconSizes)
                             {
-                                using (Bitmap resizedImage = new Bitmap(pngImage, new Size(size, size)))
+                                using (Image<Rgba32> resizedImage = pngImage.Clone(x => x.Resize(size, size)))
                                 {
                                     using (MemoryStream memoryStream = new MemoryStream())
                                     {
-                                        resizedImage.Save(memoryStream, ImageFormat.Png);
+                                        resizedImage.Save(memoryStream, new PngEncoder());
 
                                         // Write the directory entry
                                         writer.Write((byte)size); // Width
@@ -125,11 +117,11 @@ namespace PngToIcoConverter
 
                             foreach (int size in iconSizes)
                             {
-                                using (Bitmap resizedImage = new Bitmap(pngImage, new Size(size, size)))
+                                using (Image<Rgba32> resizedImage = pngImage.Clone(x => x.Resize(size, size)))
                                 {
                                     using (MemoryStream memoryStream = new MemoryStream())
                                     {
-                                        resizedImage.Save(memoryStream, ImageFormat.Png);
+                                        resizedImage.Save(memoryStream, new PngEncoder());
                                         writer.Write(memoryStream.ToArray());
                                     }
                                 }
@@ -180,10 +172,10 @@ namespace PngToIcoConverter
                                 // Use MemoryStream to read PNG properly
                                 using (MemoryStream memoryStream = new MemoryStream(imageData))
                                 {
-                                    using (Bitmap bmp = new Bitmap(memoryStream))
+                                    using (Image<Rgba32> bmp = Image.Load<Rgba32>(memoryStream))
                                     {
                                         string outputFilePath = Path.Combine(outputDir, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_{width}x{height}.png");
-                                        bmp.Save(outputFilePath, ImageFormat.Png);
+                                        bmp.Save(outputFilePath, new PngEncoder());
                                     }
                                 }
                             }
