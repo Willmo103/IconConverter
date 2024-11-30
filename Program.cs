@@ -1,8 +1,6 @@
-﻿using System;
-using System.Drawing;
+﻿using System.Drawing;
 using System.Drawing.Imaging;
-using System.IO;
-using System.Collections.Generic;
+
 
 namespace PngToIcoConverter
 {
@@ -26,6 +24,7 @@ namespace PngToIcoConverter
                         break;
                     case "--unpack":
                         unpack = true;
+                        if (i + 1 < args.Length) inputFilePath = args[++i];
                         break;
                     case "--help":
                         PrintManPage();
@@ -38,7 +37,7 @@ namespace PngToIcoConverter
 
             if (string.IsNullOrEmpty(inputFilePath))
             {
-                Console.WriteLine("Error: Input file must be specified with -i.");
+                Console.WriteLine("Error: Input file must be specified with -i or --unpack <input_ico_file>.");
                 return;
             }
 
@@ -72,7 +71,7 @@ namespace PngToIcoConverter
 
         static void ConvertPngToIco(string inputFilePath, string outputFolderPath)
         {
-            using (Bitmap pngImage = (Bitmap)Image.FromFile(inputFilePath))
+            using (var pngImage = new Bitmap(inputFilePath))
             {
                 if (pngImage == null)
                 {
@@ -164,8 +163,15 @@ namespace PngToIcoConverter
                         reader.BaseStream.Seek(imageOffset, SeekOrigin.Begin);
                         byte[] imageData = reader.ReadBytes(imageSize);
 
-                        string outputFilePath = Path.Combine(outputDir, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_{width}x{height}.png");
-                        File.WriteAllBytes(outputFilePath, imageData);
+                        // Use MemoryStream to read PNG properly
+                        using (MemoryStream memoryStream = new MemoryStream(imageData))
+                        {
+                            using (Bitmap bmp = new Bitmap(memoryStream))
+                            {
+                                string outputFilePath = Path.Combine(outputDir, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_{width}x{height}.png");
+                                bmp.Save(outputFilePath, ImageFormat.Png);
+                            }
+                        }
                     }
                 }
             }
@@ -178,12 +184,13 @@ namespace PngToIcoConverter
             Console.WriteLine("PngToIcoConverter - A tool to convert PNG images to ICO files and unpack ICO files.");
             Console.WriteLine();
             Console.WriteLine("Usage:");
-            Console.WriteLine("  PngToIcoConverter -i <input_png_file> [-o <output_folder>] [--unpack] [--help]");
+            Console.WriteLine("  PngToIcoConverter -i <input_png_file> [-o <output_folder>] [--help]");
+            Console.WriteLine("  PngToIcoConverter --unpack <input_ico_file> [-o <output_folder>] [--help]");
             Console.WriteLine();
             Console.WriteLine("Options:");
             Console.WriteLine("  -i <input_png_file>   Specify the input PNG file to be converted.");
             Console.WriteLine("  -o <output_folder>    Specify the output folder for the ICO file or unpacked images (default: ~/Pictures/PngToIcon).");
-            Console.WriteLine("  --unpack              Unpack an ICO file into its constituent image sizes.");
+            Console.WriteLine("  --unpack <input_ico_file>  Unpack an ICO file into its constituent image sizes.");
             Console.WriteLine("  --help                Display this help message.");
         }
     }
