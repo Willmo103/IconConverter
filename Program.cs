@@ -11,7 +11,6 @@ namespace PngToIcoConverter
         {
             string inputFilePath = null;
             string outputFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyPictures), "PngToIcon");
-            bool unpack = false;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -23,22 +22,19 @@ namespace PngToIcoConverter
                     case "-o":
                         if (i + 1 < args.Length) outputFolderPath = args[++i];
                         break;
-                    case "--unpack":
-                        unpack = true;
-                        if (i + 1 < args.Length) inputFilePath = args[++i];
-                        break;
                     case "--help":
                         PrintManPage();
                         return;
                     default:
                         Console.WriteLine($"Unknown argument: {args[i]}");
+                        PrintManPage();
                         return;
                 }
             }
 
             if (string.IsNullOrEmpty(inputFilePath))
             {
-                Console.WriteLine("Error: Input file must be specified with -i or --unpack <input_ico_file>.");
+                Console.WriteLine("Error: Input file must be specified with -i.");
                 return;
             }
 
@@ -55,14 +51,7 @@ namespace PngToIcoConverter
 
             try
             {
-                if (unpack)
-                {
-                    UnpackIcoFile(inputFilePath, outputFolderPath);
-                }
-                else
-                {
-                    ConvertPngToIco(inputFilePath, outputFolderPath);
-                }
+                ConvertPngToIco(inputFilePath, outputFolderPath);
             }
             catch (Exception ex)
             {
@@ -138,75 +127,16 @@ namespace PngToIcoConverter
             }
         }
 
-        static void UnpackIcoFile(string inputFilePath, string outputFolderPath)
-        {
-            try
-            {
-                string outputDir = Path.Combine(outputFolderPath, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_sizes");
-                if (!Directory.Exists(outputDir))
-                {
-                    Directory.CreateDirectory(outputDir);
-                }
-
-                using (FileStream icoStream = new FileStream(inputFilePath, FileMode.Open))
-                {
-                    using (BinaryReader reader = new BinaryReader(icoStream))
-                    {
-                        reader.BaseStream.Seek(4, SeekOrigin.Begin);
-                        short imageCount = reader.ReadInt16();
-
-                        for (int i = 0; i < imageCount; i++)
-                        {
-                            reader.BaseStream.Seek(6 + i * 16, SeekOrigin.Begin);
-                            int width = reader.ReadByte();
-                            int height = reader.ReadByte();
-                            reader.BaseStream.Seek(8, SeekOrigin.Current);
-                            int imageSize = reader.ReadInt32();
-                            int imageOffset = reader.ReadInt32();
-
-                            reader.BaseStream.Seek(imageOffset, SeekOrigin.Begin);
-                            byte[] imageData = reader.ReadBytes(imageSize);
-
-                            try
-                            {
-                                // Use MemoryStream to read PNG properly
-                                using (MemoryStream memoryStream = new MemoryStream(imageData))
-                                {
-                                    using (Image<Rgba32> bmp = Image.Load<Rgba32>(memoryStream))
-                                    {
-                                        string outputFilePath = Path.Combine(outputDir, $"{Path.GetFileNameWithoutExtension(inputFilePath)}_{width}x{height}.png");
-                                        bmp.Save(outputFilePath, new PngEncoder());
-                                    }
-                                }
-                            }
-                            catch (Exception bmpEx)
-                            {
-                                Console.WriteLine($"Error processing image at index {i}: {bmpEx.Message}");
-                            }
-                        }
-                    }
-                }
-
-                Console.WriteLine($"Successfully unpacked ICO file '{inputFilePath}' to '{outputDir}'.");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex.Message}");
-            }
-        }
-
         static void PrintManPage()
         {
-            Console.WriteLine("PngToIcoConverter - A tool to convert PNG images to ICO files and unpack ICO files.");
+            Console.WriteLine("PngToIcoConverter - A tool to convert PNG images to ICO files.");
             Console.WriteLine();
             Console.WriteLine("Usage:");
             Console.WriteLine("  PngToIcoConverter -i <input_png_file> [-o <output_folder>] [--help]");
-            Console.WriteLine("  PngToIcoConverter --unpack <input_ico_file> [-o <output_folder>] [--help]");
             Console.WriteLine();
             Console.WriteLine("Options:");
             Console.WriteLine("  -i <input_png_file>   Specify the input PNG file to be converted.");
-            Console.WriteLine("  -o <output_folder>    Specify the output folder for the ICO file or unpacked images (default: ~/Pictures/PngToIcon).");
-            Console.WriteLine("  --unpack <input_ico_file>  Unpack an ICO file into its constituent image sizes.");
+            Console.WriteLine("  -o <output_folder>    Specify the output folder for the ICO file (default: ~/Pictures/PngToIcon).");
             Console.WriteLine("  --help                Display this help message.");
         }
     }
